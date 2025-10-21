@@ -1,0 +1,30 @@
+﻿@inherits LayoutComponentBase
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="css/pico.min.css" />
+    <link rel="stylesheet" href="css/flatpickr.min.css" />
+    <link rel="stylesheet" href="AzureDevOps.styles.css" />
+    
+    <script src="js/htmx.min.js"></script>
+    <script src="js/htmx.ext.form-json.js"></script>
+    <script src="js/htmx.ext.sse.min.js"></script>
+    <script src="js/alpinejs.min.js"></script>
+    <script src="js/surreal.js"></script>
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet />
+</head>
+
+<body hx-ext="form-json">
+    @Body
+</body>
+
+</html>
+@code {
+    public const string IdMain = "main";
+}

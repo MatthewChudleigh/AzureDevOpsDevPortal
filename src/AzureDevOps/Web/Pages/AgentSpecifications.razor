@@ -1,0 +1,439 @@
+@page "/agent-specifications"
+@using AzureDevOps.Services
+@implements IDisposable
+@inject IAzureDevOpsQuery AzureDevOpsQuery
+@inject IAzureDevOpsCommand AzureDevOpsCommand
+
+<PageTitle>Agent Specifications</PageTitle>
+
+<div class="page-title-area">
+    <h1>Agent Specifications Management</h1>
+    <button class="btn btn-primary" @onclick="RefreshEnvironments">Refresh</button>
+</div>
+
+@if (_loading)
+{
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+}
+else if (_error != null)
+{
+    <div class="alert alert-danger" role="alert">
+        <h4 class="alert-heading">Error!</h4>
+        <p>@_error</p>
+    </div>
+}
+else if (_environments.Count == 0)
+{
+    <div class="alert alert-info" role="alert">
+        No environments found.
+    </div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Bulk Agent Specification Update</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">From Agent Specification:</label>
+                    <input type="text" class="form-control" @bind="_fromAgentSpec" placeholder="e.g., windows-2019" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">To Agent Specification:</label>
+                    <input type="text" class="form-control" @bind="_toAgentSpec" placeholder="e.g., windows-latest" />
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button class="btn btn-warning me-2" 
+                            @onclick="SelectMatchingEnvironments"
+                            disabled="@(string.IsNullOrWhiteSpace(_fromAgentSpec))">
+                        Select Matching
+                    </button>
+                    <button class="btn btn-success" 
+                            @onclick="BulkUpdateAgentSpecifications"
+                            disabled="@(_selectedEnvironments.Count == 0 || string.IsNullOrWhiteSpace(_toAgentSpec) || _updating)">
+                        @if (_updating)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Update Selected (@_selectedEnvironments.Count)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_updateResults.Count > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Update Results</h5>
+            </div>
+            <div class="card-body">
+                @foreach (var result in _updateResults)
+                {
+                    <div class="alert @(result.Success ? "alert-success" : "alert-danger")" role="alert">
+                        <strong>@result.PipelineName - @result.EnvironmentName:</strong> @result.Message
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="card">
+        <div class="card-header">
+            <h5>Environment Agent Specifications</h5>
+            <div class="text-muted">
+                Select environments to update their agent specifications in bulk
+            </div>
+        </div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>
+                            <input type="checkbox" 
+                                   class="form-check-input" 
+                                   @onchange="ToggleSelectAll"
+                                   checked="@(_selectedEnvironments.Count == _environments.Count && _environments.Count > 0)" />
+                        </th>
+                        <th>Pipeline</th>
+                        <th>Environment</th>
+                        <th>Current Agent Spec</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var env in _environments)
+                    {
+                        <tr class="@(GetRowClass(env))">
+                            <td>
+                                @if (env.CanUpdate)
+                                {
+                                    <input type="checkbox" 
+                                           class="form-check-input" 
+                                           checked="@_selectedEnvironments.Contains(env)"
+                                           @onchange="@((e) => ToggleEnvironmentSelection(env))" />
+                                }
+                            </td>
+                            <td>
+                                <strong>@env.PipelineName</strong>
+                                <br />
+                                <small class="text-muted">ID: @env.PipelineId</small>
+                            </td>
+                            <td>
+                                <strong>@env.EnvironmentName</strong>
+                                <br />
+                                <small class="text-muted">ID: @env.EnvironmentId</small>
+                            </td>
+                            <td>
+                                <span class="badge @GetAgentSpecClass(env.CurrentAgentSpec)">
+                                    @env.CurrentAgentSpec
+                                </span>
+                            </td>
+                            <td>
+                                @if (env.CanUpdate)
+                                {
+                                    <span class="badge badge-success">Available</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary">Read-only</span>
+                                }
+                            </td>
+                            <td>
+                                @if (env.CanUpdate)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            @onclick="() => ShowUpdateDialog(env)"
+                                            disabled="@_updating">
+                                        Update
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<!-- Update Dialog Modal -->
+@if (_showUpdateDialog && _selectedEnvironmentForUpdate != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Update Agent Specification</h5>
+                    <button type="button" class="btn-close" @onclick="CloseUpdateDialog"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Pipeline:</strong> @_selectedEnvironmentForUpdate.PipelineName</p>
+                    <p><strong>Environment:</strong> @_selectedEnvironmentForUpdate.EnvironmentName</p>
+                    <p><strong>Current Agent Spec:</strong> @_selectedEnvironmentForUpdate.CurrentAgentSpec</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">New Agent Specification:</label>
+                        <input type="text" class="form-control" @bind="_newAgentSpec" placeholder="e.g., windows-latest" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseUpdateDialog">Cancel</button>
+                    <button type="button" class="btn btn-primary" 
+                            @onclick="UpdateSingleEnvironment"
+                            disabled="@(string.IsNullOrWhiteSpace(_newAgentSpec) || _updating)">
+                        @if (_updating)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Update
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly CancellationTokenSource _cts = new();
+    private List<Models.EnvironmentAgentInfo> _environments = new();
+    private readonly HashSet<Models.EnvironmentAgentInfo> _selectedEnvironments = new();
+    private bool _loading = true;
+    private bool _updating = false;
+    private string? _error;
+    private string _fromAgentSpec = "windows-2019";
+    private string _toAgentSpec = "windows-latest";
+    
+    // Single update dialog
+    private bool _showUpdateDialog = false;
+    private Models.EnvironmentAgentInfo? _selectedEnvironmentForUpdate;
+    private string _newAgentSpec = "";
+    
+    // Update results
+    private List<UpdateResult> _updateResults = new();
+
+    public class UpdateResult
+    {
+        public string PipelineName { get; set; } = "";
+        public string EnvironmentName { get; set; } = "";
+        public bool Success { get; set; }
+        public string Message { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshEnvironments();
+    }
+
+    private async Task RefreshEnvironments()
+    {
+        try
+        {
+            _loading = true;
+            _error = null;
+            _updateResults.Clear();
+            _selectedEnvironments.Clear();
+            _environments = await AzureDevOpsQuery.GetEnvironmentAgentSpecificationsAsync(_cts.Token);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load environment agent specifications: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        var isChecked = (bool)(e.Value ?? false);
+        _selectedEnvironments.Clear();
+        
+        if (isChecked)
+        {
+            foreach (var env in _environments.Where(e => e.CanUpdate))
+            {
+                _selectedEnvironments.Add(env);
+            }
+        }
+        
+        StateHasChanged();
+    }
+
+    private void ToggleEnvironmentSelection(Models.EnvironmentAgentInfo environment)
+    {
+        if (!_selectedEnvironments.Remove(environment))
+        {
+            _selectedEnvironments.Add(environment);
+        }
+        StateHasChanged();
+    }
+
+    private void SelectMatchingEnvironments()
+    {
+        _selectedEnvironments.Clear();
+        
+        if (!string.IsNullOrWhiteSpace(_fromAgentSpec))
+        {
+            foreach (var env in _environments.Where(e => e.CanUpdate && 
+                e.CurrentAgentSpec.Contains(_fromAgentSpec, StringComparison.OrdinalIgnoreCase)))
+            {
+                _selectedEnvironments.Add(env);
+            }
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task BulkUpdateAgentSpecifications()
+    {
+        if (_selectedEnvironments.Count == 0 || string.IsNullOrWhiteSpace(_toAgentSpec))
+            return;
+
+        try
+        {
+            _updating = true;
+            _updateResults.Clear();
+            StateHasChanged();
+
+            var updateRequests = _selectedEnvironments.Select(env => 
+                new IAzureDevOpsCommand.UpdateAgentSpecRequest(
+                    env.PipelineId, 
+                    env.EnvironmentId, 
+                    _toAgentSpec
+                )).ToList();
+
+            // Update each environment and track results
+            foreach (var request in updateRequests)
+            {
+                var env = _selectedEnvironments.First(e => e.PipelineId == request.PipelineId && e.EnvironmentId == request.EnvironmentId);
+                try
+                {
+                    await AzureDevOpsCommand.UpdateAgentSpecification(request, _cts.Token);
+                    _updateResults.Add(new UpdateResult
+                    {
+                        PipelineName = env.PipelineName,
+                        EnvironmentName = env.EnvironmentName,
+                        Success = true,
+                        Message = $"Successfully updated from '{env.CurrentAgentSpec}' to '{_toAgentSpec}'"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _updateResults.Add(new UpdateResult
+                    {
+                        PipelineName = env.PipelineName,
+                        EnvironmentName = env.EnvironmentName,
+                        Success = false,
+                        Message = $"Failed to update: {ex.Message}"
+                    });
+                }
+            }
+
+            // Refresh the data to show updated specifications
+            await RefreshEnvironments();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Bulk update failed: {ex.Message}";
+        }
+        finally
+        {
+            _updating = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowUpdateDialog(Models.EnvironmentAgentInfo environment)
+    {
+        _selectedEnvironmentForUpdate = environment;
+        _newAgentSpec = "";
+        _showUpdateDialog = true;
+        StateHasChanged();
+    }
+
+    private void CloseUpdateDialog()
+    {
+        _showUpdateDialog = false;
+        _selectedEnvironmentForUpdate = null;
+        _newAgentSpec = "";
+        StateHasChanged();
+    }
+
+    private async Task UpdateSingleEnvironment()
+    {
+        if (_selectedEnvironmentForUpdate == null || string.IsNullOrWhiteSpace(_newAgentSpec))
+            return;
+
+        try
+        {
+            _updating = true;
+            StateHasChanged();
+
+            var request = new IAzureDevOpsCommand.UpdateAgentSpecRequest(
+                _selectedEnvironmentForUpdate.PipelineId,
+                _selectedEnvironmentForUpdate.EnvironmentId,
+                _newAgentSpec
+            );
+
+            await AzureDevOpsCommand.UpdateAgentSpecification(request, _cts.Token);
+            
+            _updateResults.Add(new UpdateResult
+            {
+                PipelineName = _selectedEnvironmentForUpdate.PipelineName,
+                EnvironmentName = _selectedEnvironmentForUpdate.EnvironmentName,
+                Success = true,
+                Message = $"Successfully updated from '{_selectedEnvironmentForUpdate.CurrentAgentSpec}' to '{_newAgentSpec}'"
+            });
+
+            CloseUpdateDialog();
+            await RefreshEnvironments();
+        }
+        catch (Exception ex)
+        {
+            _updateResults.Add(new UpdateResult
+            {
+                PipelineName = _selectedEnvironmentForUpdate?.PipelineName ?? "",
+                EnvironmentName = _selectedEnvironmentForUpdate?.EnvironmentName ?? "",
+                Success = false,
+                Message = $"Failed to update: {ex.Message}"
+            });
+        }
+        finally
+        {
+            _updating = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string GetRowClass(Models.EnvironmentAgentInfo env)
+    {
+        return env.CanUpdate ? "" : "table-secondary";
+    }
+
+    private static string GetAgentSpecClass(string agentSpec)
+    {
+        return agentSpec.ToLower() switch
+        {
+            var spec when spec.Contains("windows-2019") => "badge-warning",
+            var spec when spec.Contains("windows-latest") => "badge-success",
+            var spec when spec.Contains("ubuntu") => "badge-info",
+            var spec when spec.Contains("macos") => "badge-secondary",
+            _ => "badge-light"
+        };
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}
