@@ -25,9 +25,11 @@ public record ReleaseEnvironmentDetails(Release? Release, Dictionary<int, Enviro
 public interface IAzureDevOpsCommand
 {
     public record StartReleaseRequest(int ReleaseId, int EnvId, string Status, DateTime? ScheduledTime);
+    public record CancelReleaseRequest(int ReleaseId, int EnvId, string Status);
     public record UpdateAgentSpecRequest(int PipelineId, int EnvironmentId, string NewAgentSpec);
     Task StartRelease(StartReleaseRequest request, CancellationToken cancel);
     Task StartReleases(IEnumerable<StartReleaseRequest> requests, CancellationToken cancel);
+    Task CancelReleases(IEnumerable<CancelReleaseRequest> requests, CancellationToken cancel);
     Task ApproveRelease(int approvalId, CancellationToken cancel);
     Task ApproveReleases(IEnumerable<int> approvalIds, CancellationToken cancel);
     Task UpdateAgentSpecification(UpdateAgentSpecRequest request, CancellationToken cancel);
@@ -352,6 +354,12 @@ public class AzureDevOpsService : IAzureDevOpsQuery, IAzureDevOpsCommand
         await Task.WhenAll(tasks);
     }
     
+    public async Task CancelReleases(IEnumerable<IAzureDevOpsCommand.CancelReleaseRequest> requests, CancellationToken cancel)
+    {
+        var tasks = requests.Select(request => CancelRelease(request, cancel));
+        await Task.WhenAll(tasks);
+    }
+    
     public async Task ApproveReleases(IEnumerable<int> approvalIds, CancellationToken cancel)
     {
         var tasks = approvalIds.Select(approvalId => ApproveRelease(approvalId, cancel));
@@ -541,6 +549,26 @@ public class AzureDevOpsService : IAzureDevOpsQuery, IAzureDevOpsCommand
             var jsonBody = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
             var parameter = (_apiVersionForPatchRelease != null ? $"?api-version={_apiVersionForPatchRelease}" : "");
             var response = await _httpClient.PatchAsync($"_apis/release/releases/{releaseRequest.ReleaseId}/environments/{releaseRequest.EnvId}{parameter}", jsonBody, cancel);
+            
+            await response.Content.ReadAsStringAsync(cancel);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error starting/scheduling release environment in Azure DevOps");
+            throw;
+        }
+    }
+    
+    public async Task CancelRelease(IAzureDevOpsCommand.CancelReleaseRequest cancelReleaseRequest, CancellationToken cancel)
+    {
+        try
+        {
+            var request = new PatchReleaseEnvironmentRequest("canceled", null); 
+            var json = JsonSerializer.Serialize(request, JsonOptions);
+            var jsonBody = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var parameter = (_apiVersionForPatchRelease != null ? $"?api-version={_apiVersionForPatchRelease}" : "");
+            var response = await _httpClient.PatchAsync($"_apis/release/releases/{cancelReleaseRequest.ReleaseId}/environments/{cancelReleaseRequest.EnvId}{parameter}", jsonBody, cancel);
             
             await response.Content.ReadAsStringAsync(cancel);
             response.EnsureSuccessStatusCode();

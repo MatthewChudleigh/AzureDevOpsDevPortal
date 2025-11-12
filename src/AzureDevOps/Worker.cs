@@ -89,7 +89,23 @@ public class AzureDevOpsQueryProxy(IHostApplicationLifetime lifetime, Worker wor
                 StartRelease: new Worker.StartRelease(request)), cts.Token);
         }
     }
+    public async Task CancelRelease(IAzureDevOpsCommand.CancelReleaseRequest cancelReleaseRequest, CancellationToken cancel)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancel, lifetime.ApplicationStopping, lifetime.ApplicationStopped);
+        await worker.Messages.Writer.WriteAsync(new Worker.Message(cts.Token, 
+            CancelRelease: new Worker.CancelRelease(cancelReleaseRequest)), cts.Token);
+    }
 
+    public async Task CancelReleases(IEnumerable<IAzureDevOpsCommand.CancelReleaseRequest> requests,
+        CancellationToken cancel)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancel, lifetime.ApplicationStopping, lifetime.ApplicationStopped);
+        foreach (var request in requests)
+        {
+            await worker.Messages.Writer.WriteAsync(new Worker.Message(cts.Token,
+                CancelRelease: new Worker.CancelRelease(request)), cts.Token);
+        }
+    }
     public async Task ApproveRelease(int approvalId, CancellationToken cancel)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancel, lifetime.ApplicationStopping, lifetime.ApplicationStopped);
@@ -129,7 +145,8 @@ public enum ReleaseEnvironmentAction
 {
     Release,
     Schedule,
-    Approve
+    Approve,
+    Cancel
 }
 
 public record EnvironmentDetails(
@@ -198,6 +215,7 @@ public class Worker(ILogger<Worker> logger, IHostApplicationLifetime lifetime, I
     public record GetReleasePipelineDefinition(int PipelineId, Channel<ReleasePipeline?> Response);
     public record ApproveRelease(int ApprovalId);
     public record StartRelease(IAzureDevOpsCommand.StartReleaseRequest StartReleaseRequest);
+    public record CancelRelease(IAzureDevOpsCommand.CancelReleaseRequest CancelReleaseRequest);
     public record UpdateAgentSpec(IAzureDevOpsCommand.UpdateAgentSpecRequest UpdateAgentSpecRequest);
     
     public record Message(
@@ -210,6 +228,7 @@ public class Worker(ILogger<Worker> logger, IHostApplicationLifetime lifetime, I
         GetReleasePipelineDefinition? GetReleasePipelineDefinition = null,
         ApproveRelease? ApproveRelease = null,
         StartRelease? StartRelease = null,
+        CancelRelease? CancelRelease = null,
         UpdateAgentSpec? UpdateAgentSpec = null);
     
     public readonly Channel<Message> Messages = Channel.CreateUnbounded<Message>();
@@ -283,6 +302,10 @@ public class Worker(ILogger<Worker> logger, IHostApplicationLifetime lifetime, I
             else if (message.UpdateAgentSpec is not null)
             {
                 await azure.UpdateAgentSpecification(message.UpdateAgentSpec.UpdateAgentSpecRequest, cts.Token);
+            }
+            else if (message.CancelRelease is not null)
+            {
+                await azure.CancelRelease(message.CancelRelease.CancelReleaseRequest, cts.Token);
             }
         }
         catch (OperationCanceledException) when (message.Cancel.IsCancellationRequested)

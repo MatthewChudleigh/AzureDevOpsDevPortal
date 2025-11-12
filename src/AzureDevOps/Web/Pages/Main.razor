@@ -11,7 +11,7 @@
             <span class="htmx-indicator" aria-busy="true"></span>Refresh
         </button>
     </div>
-    
+
     @Pipelines()
 </main>
 
@@ -31,7 +31,7 @@
               hx-trigger="load" hx-get="@ApiPipelines" hx-target="#@IdReleasePipelines" hx-swap="outerHTML">
             <span>Loading...</span>
         </div>;
-    
+
     private static RenderFragment PipelinesTable(Models.ReleasePipelinesResponse.ReleasePipeline[] pipelines) =>
         @<div id="@IdReleasePipelines">
             <table>
@@ -49,21 +49,21 @@
                     <tr>
                         <td>
                             <div role="group">
-                            <button hx-get=@(ApiPipeline(pipeline.Id.ToString()))
-                                    hx-target="#@MainLayout.IdMain" hx-swap="outerHTML"
-                                    hx-push-url="true">
-                                View Pipeline
-                            </button>
-                            @if (pipeline.Links.TryGetValue("web", out var link))
-                            {
-                                <a href="@link.Href" target="_blank">
-                                    <button class="secondary">Go to Azure</button>
-                                </a>
-                            }
-                            else
-                            {
-                                <span></span>
-                            }
+                                <button hx-get=@(ApiPipeline(pipeline.Id.ToString()))
+                                        hx-target="#@MainLayout.IdMain" hx-swap="outerHTML"
+                                        hx-push-url="true">
+                                    View Pipeline
+                                </button>
+                                @if (pipeline.Links.TryGetValue("web", out var link))
+                                {
+                                    <a href="@link.Href" target="_blank">
+                                        <button class="secondary">Go to Azure</button>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <span></span>
+                                }
                             </div>
                         </td>
                         <td>@pipeline.Id</td>
@@ -88,10 +88,10 @@
                         <strong>ID:</strong> @pipeline.Id
                         <strong>Name:</strong> @pipeline.Name
                     </header>
-                    
+
                     <p><strong>Environments:</strong> @pipeline.Environments.Length</p>
                     <p><strong>Variables:</strong> @pipeline.Variables.Count</p>
-                    
+
                     <footer>
                         @if (pipeline.Links.TryGetValue("web", out var link))
                         {
@@ -106,8 +106,8 @@
 
                 <div id="@IdReleasesList"
                      hx-trigger="load"
-                    hx-get=@(ApiReleases(pipeline.Id.ToString()))
-                    hx-target="#@IdReleasesList" hx-swap="outerHTML">
+                     hx-get=@(ApiReleases(pipeline.Id.ToString()))
+                     hx-target="#@IdReleasesList" hx-swap="outerHTML">
                 </div>
             </div>
         </main>;
@@ -121,6 +121,7 @@
         </main>;
 
     private const string IdReleasesList = "releases-list";
+
     private static RenderFragment ReleasesList(int pipelineId, Models.ReleasesResponse releases) =>
         @<table id="@IdReleasesList">
             <thead>
@@ -166,7 +167,7 @@
 
 
     private static RenderFragment MainRelease(
-        string pipelineId, string releaseId, 
+        string pipelineId, string releaseId,
         string? enabledStatus, ReleaseEnvironmentDetails release) =>
         @<main id="@MainLayout.IdMain" class="container-fluid">
             <h1>Azure DevOps Release Details</h1>
@@ -196,8 +197,8 @@
                         }
                     },
                     pushStatus(s) {
-                      this.status.push(s);
-                      this.setReleaseText();
+                        this.status.push(s);
+                        this.setReleaseText();
                     },
                     popStatus() {
                         this.status.pop();
@@ -218,6 +219,7 @@
 
     private const string IdReleaseSelection = "release-selection";
     private const string IdReleaseSelectionList = "release-selection-rows";
+
     private static RenderFragment ReleaseSelections(string pipelineId, string releaseId) =>
         @<div id="@IdReleaseSelection" hx-include="#@IdReleaseSelection input">
             <input type="hidden" name="release-id" value="@releaseId">
@@ -229,28 +231,28 @@
                         <input id="dt" x-model="datetime" name="release-datetime" placeholder="Select date & time">
 
                         <script type="module">
-                          import flatpickr from "https://cdn.jsdelivr.net/npm/flatpickr/+esm";
-                        
-                          const fp = flatpickr("#dt", {
-                            enableTime: true,
-                            enableSeconds: true,          // omit if you don't need seconds
-                            dateFormat: "Y-m-d H:i:S",    // display format only
-                            time_24hr: true,              // set false for 12h
-                          });
-                        
-                          // Example: on submit, send UTC instant
-                          function getUtcInstant() {
-                            const d = fp.selectedDates?.[0];
-                            return d ? d.toISOString() : null; // e.g., "2025-10-21T08:30:00.000Z"
-                          }
+                            import flatpickr from "https://cdn.jsdelivr.net/npm/flatpickr/+esm";
+
+                            const fp = flatpickr("#dt", {
+                                enableTime: true,
+                                enableSeconds: true,          // omit if you don't need seconds
+                                dateFormat: "Y-m-d H:i:S",    // display format only
+                                time_24hr: true,              // set false for 12h
+                            });
+
+                            // Example: on submit, send UTC instant
+                            function getUtcInstant() {
+                                const d = fp.selectedDates?.[0];
+                                return d ? d.toISOString() : null; // e.g., "2025-10-21T08:30:00.000Z"
+                            }
                         </script>
                     </label>
                     <div>
-                    <button hx-post="@ApiReleaseApprove(pipelineId, releaseId)"
-                            hx-target="#@IdReleaseSelection" hx-swap="outerHTML"
-                            :disabled="!datetime">
-                        Defer Release
-                    </button>
+                        <button hx-post="@ApiReleaseApprove(pipelineId, releaseId)"
+                                hx-target="#@IdReleaseSelection" hx-swap="outerHTML"
+                                :disabled="!datetime">
+                            Defer Release
+                        </button>
                     </div>
                 </fieldset>
 
@@ -258,6 +260,15 @@
                         hx-target="#@IdReleaseSelection" hx-swap="outerHTML"
                         x-text="releaseText">
                 </button>
+                
+                <fieldset x-show="status.indexOf('inProgress') >= 0" style="margin-top: 20px">
+                    <div>
+                        <button hx-post="@ApiReleaseCancel(pipelineId, releaseId)"
+                                hx-target="#@IdReleaseSelection" hx-swap="outerHTML">
+                            Cancel Release
+                        </button>
+                    </div>
+                </fieldset>
             </div>
             <table x-show="status.length > 0">
                 <thead>
@@ -290,20 +301,28 @@
 
     private static RenderFragment ReleaseSelection(EnvironmentDetails? env)
     {
-        if (env == null) return @<tr><th scope="row">Error</th><td></td><td></td></tr>;
-        
-        return @<tr id="@IdReleaseSelectionRow(env.Id)" x-data="{ active: true }" x-show="active" x-init="pushStatus('@env.Status')">
-                   <th><button class="secondary" x-on:click="active = false; popStatus()">Remove</button></th>
-                   <th scope="row">@env.Name</th>
-                   <td>@env.Status</td>
-                   <input type="hidden" name="release-env[]" value="@env.Id">
-                   <input type="hidden" name="release-status[]" value="@env.Status">
-                   <input type="hidden" name="release-approval[]" value="@env.Approval?.Id">
-                   <div id="@IdReleaseEnvironmentRow(env.Id)" hx-swap="delete" hx-swap-oob="true"></div>
-               </tr>;
+        if (env == null) return @<tr>
+            <th scope="row">Error</th>
+            <td></td>
+            <td></td>
+        </tr>;
+
+        return @<tr id="@IdReleaseSelectionRow(env.Id)" x-data="{ active: true }" x-show="active"
+                    x-init="pushStatus('@env.Status')">
+            <th>
+                <button class="secondary" x-on:click="active = false; popStatus()">Remove</button>
+            </th>
+            <th scope="row">@env.Name</th>
+            <td>@env.Status</td>
+            <input type="hidden" name="release-env[]" value="@env.Id">
+            <input type="hidden" name="release-status[]" value="@env.Status">
+            <input type="hidden" name="release-approval[]" value="@env.Approval?.Id">
+            <div id="@IdReleaseEnvironmentRow(env.Id)" hx-swap="delete" hx-swap-oob="true"></div>
+        </tr>;
     }
 
     private static string IdReleaseEnvironmentRow(int id) => $"release-environments-row-{id}";
+
     private static RenderFragment ReleaseEnvironments(
         string pipelineId, string releaseId, string? enabledStatus,
         Dictionary<int, EnvironmentDetails> environmentDetails,
@@ -328,35 +347,36 @@
         </div>;
 
     private static RenderFragment ReleaseEnvironmentRow(
-        string pipelineId, string releaseId, string? enabledStatus, 
+        string pipelineId, string releaseId, string? enabledStatus,
         Dictionary<int, EnvironmentDetails> environmentDetails,
         Models.Release.Environment env)
     {
         environmentDetails.TryGetValue(env.Id, out var details);
-        return @<tr id="@IdReleaseEnvironmentRow(env.Id)" x-show="status.length === 0 || status.indexOf('@env.Status') >= 0">
-                   <td>
-                       @if (enabledStatus == null || enabledStatus == env.Status)
-                       {
-                           <button hx-post="@ApiReleaseEnvironment(pipelineId, releaseId, env.Id.ToString())"
-                                   hx-target="#@(IdReleaseSelectionList)"
-                                   hx-swap="beforeend">
-                               Select
-                           </button>
-                       }
-                   </td>
-                   <td>
-                       <div><strong>@env.Name</strong></div>
-                       <div>@(details?.Release ?? "N/A")</div>
-                   </td>
-                   <td>
-                       <div>@env.Status</div>
-                       <div>@details?.ScheduledTime?.ToString("u")</div>
-                   </td>
-                   <td>
-                       <div>@(string.Join(" / ", env.PreDeployApprovals.Select(a => a.ApprovalType)))</div>
-                       <div>@(string.Join(" / ", env.PreDeployApprovals.Select(a => a.Status)))</div>
-                   </td>
-               </tr>;
+        return @<tr id="@IdReleaseEnvironmentRow(env.Id)"
+                    x-show="status.length === 0 || status.indexOf('@env.Status') >= 0">
+            <td>
+                @if (enabledStatus == null || enabledStatus == env.Status)
+                {
+                    <button hx-post="@ApiReleaseEnvironment(pipelineId, releaseId, env.Id.ToString())"
+                            hx-target="#@(IdReleaseSelectionList)"
+                            hx-swap="beforeend">
+                        Select
+                    </button>
+                }
+            </td>
+            <td>
+                <div><strong>@env.Name</strong></div>
+                <div>@(details?.Release ?? "N/A")</div>
+            </td>
+            <td>
+                <div>@env.Status</div>
+                <div>@details?.ScheduledTime?.ToString("u")</div>
+            </td>
+            <td>
+                <div>@(string.Join(" / ", env.PreDeployApprovals.Select(a => a.ApprovalType)))</div>
+                <div>@(string.Join(" / ", env.PreDeployApprovals.Select(a => a.Status)))</div>
+            </td>
+        </tr>;
     }
 
     private static string GetActionLabel(ReleaseEnvironmentAction action) => action switch
@@ -364,6 +384,8 @@
         ReleaseEnvironmentAction.Release => "Release",
         ReleaseEnvironmentAction.Schedule => "Schedule",
         ReleaseEnvironmentAction.Approve => "Approve",
+        ReleaseEnvironmentAction.Cancel => "Cancel",
         _ => action.ToString()
     };
+
 }
