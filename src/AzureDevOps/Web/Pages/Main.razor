@@ -1,4 +1,5 @@
 @page "/"
+@using AzureDevOps.Constants
 @using AzureDevOps.Services
 
 <PageTitle>Release Pipelines</PageTitle>
@@ -369,7 +370,10 @@
                 <div>@(details?.Release ?? "N/A")</div>
             </td>
             <td>
-                <div>@env.Status</div>
+                <div style="@(@env.Status == EnvReleaseStatus.InProgress ? "color: blue" 
+                            : env.Status == EnvReleaseStatus.Canceled ? "color: red"
+                            : env.Status == EnvReleaseStatus.Succeeded ? "color: green"
+                            : "color: black")">@env.Status</div>
                 <div>@details?.ScheduledTime?.ToString("u")</div>
             </td>
             <td>
