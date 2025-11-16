@@ -9,7 +9,7 @@
     <base href="/"/>
     <link rel="stylesheet" href="css/pico.min.css"/>
     <link rel="stylesheet" href="css/flatpickr.min.css"/>
-    <link rel="stylesheet" href="AzureDevOps.styles.css"/>
+    <link rel="stylesheet" href="@Assets["AzureDevOps.styles.css"]"/>
 
     <script src="js/htmx.min.js"></script>
     <script src="js/htmx.ext.form-json.js"></script>
@@ -21,16 +21,7 @@
 </head>
 <body hx-ext="form-json">
 <div style="display: flex; min-height: 100vh; font-family: Arial, sans-serif;">
-    <nav style="
-        background-color: #343a40; 
-        color: white; 
-        width: 250px; 
-        padding: 15px; 
-        display: flex; 
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    ">
+    <nav>
         <div style="width: 100%;">
             <h3 style=" color: white; margin-bottom: 10px;">DevOps</h3>
             <a href="/" style="
