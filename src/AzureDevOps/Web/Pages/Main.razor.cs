@@ -25,6 +25,11 @@ public partial class Main
         string pipelineId = "{pipelineId}", 
         string releaseId = "{releaseId}") =>
         $"/main/pipelines/{pipelineId}/releases/{releaseId}/approve";
+    
+    public static string ApiReleaseCancel(
+        string pipelineId = "{pipelineId}", 
+        string releaseId = "{releaseId}") =>
+        $"/main/pipelines/{pipelineId}/releases/{releaseId}/cancel";
 
     private record ReleaseApproveRequest(
         [property: JsonPropertyName("release-id")] string ReleaseId,
@@ -84,6 +89,34 @@ public partial class Main
             else if (approvalIds.Count > 0)
             {
                 await azure.ApproveReleases(approvalIds, http.RequestAborted);
+            }
+
+            return await render.Fragment(ReleaseApproved()).ToResultAsync();
+        });
+        
+        app.MapPost(ApiReleaseCancel(), async (
+            [FromServices] Renderer render,
+            [FromServices] IAzureDevOpsCommand azure,
+            HttpContext http,
+            [FromBody] ReleaseApproveRequest request) =>
+        {
+            var envIds = new List<IAzureDevOpsCommand.CancelReleaseRequest>();
+
+            int.TryParse(request.ReleaseId, out var releaseId);
+
+
+            for (var idx = 0; idx < request.EnvironmentIds.Length; idx++)
+            {
+               if (int.TryParse(request.EnvironmentIds[idx], out var envId))
+                {
+                    var status = request.EnvironmentStatus[idx];
+                    envIds.Add(new IAzureDevOpsCommand.CancelReleaseRequest(releaseId, envId, status));
+                }
+            }
+
+            if (envIds.Count > 0)
+            {
+                await azure.CancelReleases(envIds, http.RequestAborted);
             }
 
             return await render.Fragment(ReleaseApproved()).ToResultAsync();
